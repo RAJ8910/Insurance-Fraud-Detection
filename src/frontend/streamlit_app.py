@@ -1,11 +1,9 @@
-# Simple Streamlit UI to upload CSV and call FastAPI /predict endpoint
-
 import streamlit as st
 import pandas as pd
 import requests
 import io
 
-API_URL = "http://localhost:8000/predict"  # update if API hosted elsewhere
+API_URL = "http://localhost:8000/predict"  
 
 st.title("Insurance Fraud - Model Test UI")
 st.markdown("Upload a CSV (use format like test/test.csv). Server returns CSV with Model_Output column.")
@@ -23,7 +21,6 @@ if uploaded_file is not None:
             st.success("Prediction complete — showing results")
             st.dataframe(annotated.head(200))
 
-            # Compute correctness / accuracy: "right" when Potential_fraud == Model_Output
             if {'PotentialFraud', 'Model_Output'}.issubset(annotated.columns):
                 pf = annotated['PotentialFraud'].fillna('').astype(str).str.strip().str.lower()
                 mo = annotated['Model_Output'].fillna('').astype(str).str.strip().str.lower()

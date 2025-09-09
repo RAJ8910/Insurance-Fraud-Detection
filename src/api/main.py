@@ -11,8 +11,8 @@ from typing import Optional
 app = FastAPI(title="Insurance Fraud Prediction API")
 
 # === CONFIG - change MODEL_FILE to switch model ===
-SELECTED_MODEL_FILE = "../../models/trained_models/xgboost_pipeline.pkl"  # set to other model file if needed
-ARTIFACTS_DIR = "../../models/artifacts"
+SELECTED_MODEL_FILE = "../models/trained_models/xgboost_pipeline.pkl"  # set to other model file if needed
+ARTIFACTS_DIR = "../models/artifacts"
 TARGET_ENCODER_PATH = os.path.join(ARTIFACTS_DIR, "target_encoder.pkl")
 CATEGORICAL_COLS_PATH = os.path.join(ARTIFACTS_DIR, "categorical_cols.pkl")
 MODEL_COLUMNS_PATH = os.path.join(ARTIFACTS_DIR, "model_columns.pkl")
@@ -65,13 +65,9 @@ async def predict(file: UploadFile = File(...), return_proba: Optional[bool] = F
         df_original = pd.read_csv(io.BytesIO(contents), na_values=["", "NA", "NaN"], keep_default_na=True)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Unable to read CSV: {e}")
-        
-    # --- START: Corrected Logic ---
     
-    # 1. Create a separate copy for prediction, leaving the original df untouched.
     df_for_prediction = df_original.copy()
 
-    # 2. Ensure the prediction DataFrame has exactly the columns the model was trained on.
     if _model_columns is None:
         raise HTTPException(status_code=500, detail="Model columns not loaded on server")
     try:
@@ -79,7 +75,7 @@ async def predict(file: UploadFile = File(...), return_proba: Optional[bool] = F
     except KeyError as e:
         raise HTTPException(status_code=400, detail=f"Uploaded CSV is missing required columns: {e}")
    
-    # 3. Perform preprocessing ONLY on the DataFrame copy intended for the model.
+   
     if _categorical_cols is None:
         raise HTTPException(status_code=500, detail="Categorical column list not loaded")
         
@@ -89,12 +85,24 @@ async def predict(file: UploadFile = File(...), return_proba: Optional[bool] = F
             df_for_prediction[col] = df_for_prediction[col].astype(str)
 
     try:
-        # 4. Get predictions using the clean, preprocessed data.
         preds = _loaded_pipeline.predict(df_for_prediction)
-        
+
+        confidence = None
+        model_prob_for_positive = None
+
+        if hasattr(_loaded_pipeline, "predict_proba"):
+            proba_array = _loaded_pipeline.predict_proba(df_for_prediction)
+            if proba_array.shape[1] == 2:
+                model_prob_for_positive = proba_array[:, 1]
+            try:
+                pred_indices = preds.astype(int)
+                confidence = proba_array[np.arange(len(preds)), pred_indices]
+            except Exception:
+                confidence = proba_array.max(axis=1)
+
         probs = None
-        if return_proba and hasattr(_loaded_pipeline, "predict_proba"):
-            probs = _loaded_pipeline.predict_proba(df_for_prediction)[:, 1]
+        if return_proba and model_prob_for_positive is not None:
+            probs = model_prob_for_positive
 
         if _target_encoder is not None:
             mapped_preds = _target_encoder.inverse_transform(preds.astype(int))
@@ -104,12 +112,16 @@ async def predict(file: UploadFile = File(...), return_proba: Optional[bool] = F
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Model prediction error: {e}")
 
-    # 5. Add the prediction results back to the FULL, ORIGINAL DataFrame.
     df_original["Model_Output"] = mapped_preds
     if probs is not None:
         df_original["Model_Prob"] = probs
 
-    # 6. Return the original data with the new prediction column.
+
+    if confidence is not None:
+        df_original["Confidence"] = confidence
+    else:
+        df_original["Confidence"] = None
+
     out_csv = df_original.to_csv(index=False).encode("utf-8")
     return StreamingResponse(io.BytesIO(out_csv), media_type="text/csv",
                              headers={"Content-Disposition": f"attachment; filename=predicted_{file.filename}"})
