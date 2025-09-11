@@ -83,12 +83,10 @@ Recommended: **Google Colab** for running notebooks.
 ## 📂 Project Structure
 ```
 Insurance-Fraud-Detection/
-│
+├── models/                # Saved models and artifacts
+├── notebooks/             # EDA and model training notebooks
 ├── src/
 │   ├── api/               # FastAPI backend
 │   ├── frontend/          # Streamlit frontend
-│   └── models/            # Saved models and artifacts
-│
-├── notebooks/             # EDA and model training notebooks
 ├── requirements.txt       # Dependencies
 └── README.md              # Project documentation
