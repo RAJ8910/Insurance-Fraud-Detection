@@ -1,6 +1,7 @@
 # Insurance Fraud Detection
 
-A machine learning solution to identify potentially fraudulent insurance claims.  
+This project provides a machine learning solution for identifying potentially fraudulent insurance claims. It features a FastAPI backend that serves a trained XGBoost model and a Streamlit frontend for interactive predictions.
+
 The project includes:
 - **Backend**: FastAPI serving a trained XGBoost model  
 - **Frontend**: Streamlit interface for interactive predictions  
